@@ -100,15 +100,18 @@ awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv
 
 
 # checking what the distribution of SNPs look like - extract the postions for plotting
-awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv |    awk '{if($7>0.8 && $4>23 && $6>19) print $1,$2 $7}' OFS="\t" > MHCO3_v_MHCO18_poolsfrequency.0.8freq.pos
+awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv |    awk '{if($7>0.8 && $4>23 && $6>19) print $1,$2,$7}' OFS="\t" > MHCO3_v_MHCO18_poolsfrequency.0.8freq.pos
+
+awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv |    awk '{if($7>0.9 && $4>23 && $6>19) print $1,$2,$7}' OFS="\t" > MHCO3_v_MHCO18_poolsfrequency.0.9freq.pos
 ```
 ### make a plot
 ```R
 library(tidyverse)
 
-data <- read.table("MHCO3_v_MHCO18_poolsfrequency.0.8freq.pos", header=F)
 
-ggplot(data, aes(V2*1e6,V3,col=V1)) + 
+data_0.8 <- read.table("MHCO3_v_MHCO18_poolsfrequency.0.8freq.pos", header=F)
+
+plot_0.8 <- ggplot(data_0.8, aes(V2*1e6,V3,col=V1)) + 
     geom_point(size=0.1) + 
     facet_grid(V1~.) + 
     ylim(0,1) +
@@ -117,8 +120,28 @@ ggplot(data, aes(V2*1e6,V3,col=V1)) +
     labs(title="Variant positions that differ between MHco3 and MHco18 by > 0.8", 
         y="Variant frequency difference (min: MHCO18_freq-MHCO3_freq >0.8)", 
         x="Chromosomal position")
+plot_0.8
 
 ggsave("MHCO3_v_MHCO18_poolsfrequency.0.8freq.pos.pdf", height=7, width=7)
 ggsave("MHCO3_v_MHCO18_poolsfrequency.0.8freq.pos.png")
+
+data_0.9 <- read.table("MHCO3_v_MHCO18_poolsfrequency.0.9freq.pos", header=F)
+
+plot_0.9 <- ggplot(data_0.9, aes(V2*1e6,V3,col=V1)) + 
+    geom_point(size=0.1) + 
+    facet_grid(V1~.) + 
+    ylim(0,1) +
+    theme_bw() +
+    guides(color = FALSE) +
+    labs(title="Variant positions that differ between MHco3 and MHco18 by > 0.9", 
+        y="Variant frequency difference (min: MHCO18_freq-MHCO3_freq >0.9)", 
+        x="Chromosomal position")
+plot_0.9
+
+ggsave("MHCO3_v_MHCO18_poolsfrequency.0.9freq.pos.pdf", height=7, width=7)
+ggsave("MHCO3_v_MHCO18_poolsfrequency.0.9freq.pos.png")
 ```
 ![](../04_analysis/MHCO3_v_MHCO18_poolsfrequency.0.8freq.pos.png)
+![](../04_analysis/MHCO3_v_MHCO18_poolsfrequency.0.9freq.pos.png)
+
+
