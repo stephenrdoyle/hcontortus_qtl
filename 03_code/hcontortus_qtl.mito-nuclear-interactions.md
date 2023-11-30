@@ -32,6 +32,7 @@ ln -s ../PCA/hcontortus_chr_mtDNA_arrow_pilon.missindv0.1.maxmiss1.n256.xqtl.rec
 R
 #R version 4.0.3
 
+# load libraries
 library(tidyverse)
 library(SNPRelate)
 library(ggrepel)
@@ -51,10 +52,6 @@ data <- data.frame(sample.id = pca$sample.id,
     EV2 = pca$eigenvect[,2],    # the second eigenvector
     stringsAsFactors = FALSE)
 
-
-population <- read.table("sample-id_populations.txt", header=T, sep="\t") 
-
-data <- inner_join(data, population, by="sample.id")
 
 
 plot <- ggplot(data, aes(EV1, EV2, label=sample.id)) + 
@@ -84,3 +81,94 @@ plot +
 ggsave("mtDNA.pca.mito-groups.png")
 ```
 ![](../04_analysis/mtDNA.pca.mito-groups.png)
+
+
+```R
+# extract sample IDs based on mtDNA groups from PCA data
+#--- EV1 = x axis, EV2 = y axis
+group1 <- data %>% filter(EV1 < -0.05,
+                            EV1 > -0.125, 
+                            EV2 > 0, 
+                            EV2 < 0.05) %>% 
+                            select(sample.id) %>% 
+                            filter(grepl("XQTL",sample.id))
+
+write.table(group1, "mtDNA_group1_sampleIDs_all.list", quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+group2 <- data %>% filter(EV1 < 0.085,
+                            EV1 > 0.03, 
+                            EV2 > 0.025, 
+                            EV2 < 0.075)  %>% 
+                            select(sample.id) %>% 
+                            filter(grepl("XQTL",sample.id))
+
+write.table(group2, "mtDNA_group2_sampleIDs_all.list", quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+group3 <- data %>% filter(EV1 < 0.025,
+                            EV1 > -0.03, 
+                            EV2 > -0.04, 
+                            EV2 < 0.01)  %>% 
+                            select(sample.id) %>% 
+                            filter(grepl("XQTL",sample.id))
+
+write.table(group3, "mtDNA_group3_sampleIDs_all.list", quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+group4 <- data %>% filter(EV1 < 0.05,
+                            EV1 > -0.01, 
+                            EV2 > -0.17, 
+                            EV2 < -0.06)  %>% 
+                            select(sample.id) %>% 
+                            filter(grepl("XQTL",sample.id))
+
+write.table(group4, "mtDNA_group4_sampleIDs_all.list", quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+```
+
+```bash
+# split into susceptible and resistant groups
+for i in *_sampleIDs_all.list; do 
+    cat ${i} | grep "XQTL_DR_SUS" > ${i%_all.list}_susceptible.list; 
+    cat ${i} | grep "XQTL_DR_RES" > ${i%_all.list}_resistant.list; 
+    done
+
+wc -l *_sampleIDs_*list
+
+   78 mtDNA_group1_sampleIDs_all.list
+   13 mtDNA_group1_sampleIDs_resistant.list
+   65 mtDNA_group1_sampleIDs_susceptible.list
+   82 mtDNA_group2_sampleIDs_all.list
+   12 mtDNA_group2_sampleIDs_resistant.list
+   70 mtDNA_group2_sampleIDs_susceptible.list
+   46 mtDNA_group3_sampleIDs_all.list
+   18 mtDNA_group3_sampleIDs_resistant.list
+   28 mtDNA_group3_sampleIDs_susceptible.list
+   45 mtDNA_group4_sampleIDs_all.list
+    7 mtDNA_group4_sampleIDs_resistant.list
+   38 mtDNA_group4_sampleIDs_susceptible.list
+  502 total
+
+# make a populations file for pixy
+>mtDNA-groups_pixy_populations.list
+for i in *_sampleIDs_*list; do
+    name=$(echo ${i} | awk -F '[_\.]' '{print $4}');
+    awk -v name=$name '{print $1,name}' OFS="\t" ${i} >> mtDNA-groups_pixy_populations.list; 
+done
+
+# run pixy
+conda activate pixy
+
+
+### TEMP FILE FOR TESTING
+ln -s ../PARENT_BIAS/hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz
+ln -s ../PARENT_BIAS/hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz.tbi
+
+ln -s ../PARENT_BIAS/hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz
+ln -s ../PARENT_BIAS/hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz.tbi
+
+### TESTING - a couple of samples were missing from the old vcf, so had to remove them from the pop list
+cat mtDNA-groups_pixy_populations.list | grep -wv "XQTL_DR_SUS_L1_P3B1" | grep -vw "XQTL_DR_SUS_L1_P3D6" | grep -vw "XQTL_DR_SUS_L1_P1C4" > mtDNA-groups_pixy_populations.list2
+
+bsub.py 10 pixy_mtDNAgroups_dxy "pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations.list2 --bypass_invariant_check yes --window_size 10000"
+```
+
+Exception: ('[pixy] ERROR: the following samples are listed in the population file but not in the VCF: ', ['XQTL_DR_SUS_L1_P3B1', 'XQTL_DR_SUS_L1_P3D6', 'XQTL_DR_SUS_L1_P1C4'])
