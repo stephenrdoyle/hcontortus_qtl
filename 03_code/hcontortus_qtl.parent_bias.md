@@ -116,10 +116,14 @@ awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv
 
 
 # checking what the distribution of SNPs look like - extract the postions for plotting
-awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv |    awk '{if($7>0.8 && $4>23 && $6>19) print $1,$2,$7}' OFS="\t" > MHCO3_v_MHCO18_poolsfrequency.0.8freq.pos
+awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv |\
+    awk '{if($7>0.8 && $4>23 && $6>19) print $1,$2,$7,"UGA"; else if ($7<-0.8 && $4>23 && $6>19) print $1,$2,$7,"ISE"}' OFS="\t" > MHCO3_v_MHCO18_poolsfrequency.0.8freq.pos
 
-awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv |    awk '{if($7>0.9 && $4>23 && $6>19) print $1,$2,$7}' OFS="\t" > MHCO3_v_MHCO18_poolsfrequency.0.9freq.pos
+awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv |\
+    awk '{if($7>0.9 && $4>23 && $6>19) print $1,$2,$7,"UGA"; else if ($7<-0.9 && $4>23 && $6>19) print $1,$2,$7,"ISE"}' OFS="\t" > MHCO3_v_MHCO18_poolsfrequency.0.9freq.pos
 ```
+
+
 ### make a plot
 ```R
 library(tidyverse)
@@ -127,9 +131,9 @@ library(tidyverse)
 
 data_0.8 <- read.table("MHCO3_v_MHCO18_poolsfrequency.0.8freq.pos", header=F)
 
-plot_0.8 <- ggplot(data_0.8, aes(V2*1e6,V3,col=V1)) + 
+plot_0.8 <- ggplot(data_0.8, aes(V2*1e6,abs(V3),col=V1)) + 
     geom_point(size=0.1) + 
-    facet_grid(V1~.) + 
+    facet_grid(V1~V4) + 
     ylim(0,1) +
     theme_bw() +
     guides(color = FALSE) +
@@ -177,6 +181,8 @@ ggsave("MHCO3_v_MHCO18_poolsfrequency.0.9freq.pos.png")
 
 awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv | awk '{if($7>0.8 && $4>23 && $6>19) print $1,$2}' OFS="\t" > MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions
 
+awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv | awk '{if($7>0.8 && $4>23 && $6>19) print $1,$2 ; else if ($7<-0.8 && $4>23 && $6>19) print $1,$2}' OFS="\t" > MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions
+
 ```
 
 
@@ -186,6 +192,7 @@ awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv
 ########  TESTING  #########
 
 ln -s ../../04_VARIANTS/gatk_hc_test/GATK_HC_MERGED/hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz
+ln -s ../../04_VARIANTS/gatk_hc_test/GATK_HC_MERGED/hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz
 
 XQTL_resistant.samples.keep_list
 XQTL_susceptible.samples.keep_list - n = 219
@@ -202,6 +209,28 @@ vcftools \
 
 sed -i -e 's/:/\t/g' -e '1d' chr5_XQTL_susceptible_diff0.8_biased_variants.frq
 
+
+vcftools \
+    --gzvcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz \
+    --keep XQTL_susceptible.samples.keep_list \
+    --positions MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions \
+    --min-alleles 2 \
+    --max-alleles 2 \
+    --freq \
+    --out chr1_XQTL_susceptible_diff0.8_biased_variants
+
+sed -i -e 's/:/\t/g' -e '1d' chr1_XQTL_susceptible_diff0.8_biased_variants.frq
+
+
+
+
+
+
+
+
+
+
+
 # XQTL_resistant - freq
 vcftools \
     --gzvcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz \
@@ -213,6 +242,22 @@ vcftools \
     --out chr5_XQTL_resistant_diff0.8_biased_variants
 
 sed -i -e 's/:/\t/g' -e '1d' chr5_XQTL_resistant_diff0.8_biased_variants.frq
+
+
+vcftools \
+    --gzvcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz \
+    --keep XQTL_resistant.samples.keep_list \
+    --positions MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions \
+    --min-alleles 2 \
+    --max-alleles 2 \
+    --freq \
+    --out chr1_XQTL_resistant_diff0.8_biased_variants
+
+sed -i -e 's/:/\t/g' -e '1d' chr1_XQTL_resistant_diff0.8_biased_variants.frq
+
+
+
+
 
 
 
@@ -234,8 +279,55 @@ vcftools \
     --positions MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions \
     --min-alleles 2 \
     --max-alleles 2 \
-    --hardy \
+    --012 \
     --out chr5_XQTL_resistant_diff0.8_biased_variants
+
+
+
+awk '{$1=""; print $0}' OFS="\t" chr5_XQTL_resistant_diff0.8_biased_variants.012 > chr5_XQTL_resistant_diff0.8_biased_variants.012.2
+
+paste chr5_XQTL_resistant_diff0.8_biased_variants.012.indv chr5_XQTL_resistant_diff0.8_biased_variants.012.2 | awk '{for (i=1; i<=NF; i++) a[i]=a[i](NR!=1?FS:"")$i} END {for (i=1; i in a; i++) print a[i]}' OFS="\t" > 012.indv.geno
+
+rm tmp.012.pos2
+printf "CHR\tPOS\n" > tmp.012.pos2 ; cat chr5_XQTL_resistant_diff0.8_biased_variants.012.pos >> tmp.012.pos2
+
+paste tmp.012.pos2 012.indv.geno > genotype_matrix
+
+
+
+while read line; do 
+coords=$(echo ${line} | cut -f1,2 -d " ")
+missing=$(echo ${line} | cut -f3- -d " " | grep -o "\-1" | wc -l)
+homozygous_reference=$(echo ${line} | cut -f3- -d " " | grep -o "0" | wc -l)
+heterozygous=$(echo ${line} | cut -f3- -d " " | grep -o " 1" | wc -l)
+homozygous_variant=$(echo ${line} | cut -f3- -d " " | grep -o "2" | wc -l)
+
+total=$(echo "scale=3; $homozygous_reference + $heterozygous + $homozygous_variant" | bc -l)
+
+#p=$(((2*${homozygous_reference}+${heterozygous})/${total}))
+#q=$(((2*${homozygous_variant}+${heterozygous})/${total}))
+
+p=$(echo "scale=3; ((2 * ${homozygous_reference}) + ${heterozygous}) / (2 * ${total})" | bc -l)
+q=$(echo "scale=3; ((2 * ${homozygous_variant}) + ${heterozygous}) / (2 * ${total})" | bc -l)
+
+exp_homo_ref=$(echo "scale=3; (${p}^2) * ${total}" | bc -l)
+exp_het=$(echo "scale=3; (2*${p}*${q}) * ${total}" | bc -l)
+exp_homo_var=$(echo "scale=3; (${q}^2) * ${total}" | bc -l)
+
+chi_hom_ref=$(echo "scale=3; (${homozygous_reference}-${exp_homo_ref})^2 / ${exp_homo_ref}" | bc -l)
+chi_het=$(echo "scale=3; (${heterozygous}-${exp_het})^2/${exp_het}" | bc -l)
+chi_hom_var=$(echo "scale=3; (${homozygous_variant}-${exp_homo_var})^2/${exp_homo_var}" | bc -l)
+
+echo -e ${coords}"\t"${missing}"\t"${homozygous_reference}"\t"${heterozygous}"\t"${homozygous_variant}"\t"${exp_homo_ref}"\t"${exp_het}"\t"${exp_homo_var}"\t"${chi_hom_ref}"\t"${chi_het}"\t"${chi_hom_var}; 
+done < genotype_matrix >> genotype_matrix.chisquare
+
+
+
+
+
+
+
+
 
 
 
@@ -243,6 +335,7 @@ vcftools \
 
 R
 library(tidyverse)
+library(zoo)
 
 data_sus <- read.table("chr5_XQTL_susceptible_diff0.8_biased_variants.frq", header=F)
 data_sus$population <- "XQTL_susceptible"
@@ -252,12 +345,66 @@ data_res$population <- "XQTL_resistant"
 
 data <- bind_rows(data_sus, data_res)
 
+a<- ggplot(data, aes(V2, V8, col=population)) +
+    geom_point(size=0.1) + 
+    facet_grid(.~V1) +
+    theme_bw() 
+
+
+data <- bind_rows(data_sus, data_res)
+data <- data %>% mutate(rolling_avg = rollmean(V8, k=50, fill=NA, align='right'))
+ggplot() + geom_line(aes(data$V2, data$rolling_avg, col=data$population), size=1) + ylim(0,1) + geom_vline(xintercept=31521884)
+
+
+R
+library(tidyverse)
+library(zoo)
+
+data_sus <- read.table("chr1_XQTL_susceptible_diff0.8_biased_variants.frq", header=F)
+data_sus$population <- "XQTL_susceptible"
+
+data_res <- read.table("chr1_XQTL_resistant_diff0.8_biased_variants.frq", header=F)
+data_res$population <- "XQTL_resistant"
+
+data <- bind_rows(data_sus, data_res)
+data <- data %>% mutate(rolling_avg = rollmean(V8, k=10, fill=NA, align='right'))
 
 ggplot(data, aes(V2, V8, col=population)) +
     geom_point(size=0.5) + 
     geom_smooth() +
     facet_grid(.~V1) +
     theme_bw() 
-    
-    
-    + xlim(36e6,39e6)
+
+
+data <- data %>% mutate(rolling_avg = rollmean(V8, k=100, fill=NA, align='right'))
+ggplot(data, aes(V2, rolling_avg, col=population)) + geom_line() + ylim(0,1)
+
+
+
+
+
+
+vcftools \
+    --gzvcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz \
+    --keep XQTL_resistant.samples.keep_list \
+    --positions MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions \
+    --min-alleles 2 \
+    --max-alleles 2 \
+    --site-pi \
+    --out chr5_XQTL_resistant_diff0.8_biased_variants
+
+
+vcftools \
+    --gzvcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz \
+    --keep XQTL_susceptible.samples.keep_list \
+    --positions MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions \
+    --min-alleles 2 \
+    --max-alleles 2 \
+    --site-pi \
+    --out chr5_XQTL_susceptible_diff0.8_biased_variants
+
+
+
+pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --sites_file MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions --stats pi --populations XQTLsamples.keep_list.pixypop2 --bypass_invariant_check yes --window_size 1
+
+pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --sites_file MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions --stats dxy --populations XQTLsamples.keep_list.pixypop2 --bypass_invariant_check yes --window_size 1

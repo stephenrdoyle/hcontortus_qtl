@@ -32,6 +32,8 @@ for i in *.exon.cov; do
      echo -e "${name}\t${autosome}\t${xchromosome}";
 done > autosome_to_Xchromsome_cov_exon.stat
 
+# fix some sample names
+sed -i 's/.sorted//g' autosome_to_Xchromsome_cov_exon.stat
 ```
 
 
@@ -40,22 +42,54 @@ done > autosome_to_Xchromsome_cov_exon.stat
 
 #plotting the data median and reads mapped all samples
 library(tidyverse)
-cov_data <- read.table("autosome_to_Xchromsome_cov_200kb_med.stat")
-meta_data <- read.table ("all_samples_metadata2.txt")
+
+cov_data <- read.table("autosome_to_Xchromsome_cov_exon.stat")
+
+meta_data <- read.table ("sample_metadata.txt", sep="\t")
+
 data <- left_join(cov_data,meta_data,by="V1")
-colnames(data) <- c("sample_name", "autosome_cov_median", "autosome_cov_sd", "x_cov_median", "x_cov_sd", "reads_mapped")
-ggplot(data, aes(sample_name, x_cov_median/autosome_cov_median)) +
-      geom_point(aes(colour = log10(as.numeric(reads_mapped)))) +
+colnames(data) <- c("sample_name", "autosome_cov_median", "autosome_cov_sd", "x_cov_median", "x_cov_sd", "population", "total_reads","mapped_reads")
+
+# filter out failed samples
+data <- data %>% filter(x_cov_median/autosome_cov_median > 0.1)
+
+#ggplot(data, aes(reorder(sample_name, x_cov_median/autosome_cov_median*2-0.3), x_cov_median/autosome_cov_median*2-0.3, col=log10(mapped_reads))) +
+ggplot(data, aes(sample_name, x_cov_median/autosome_cov_median*2-0.3, col=log10(mapped_reads))) +
+    geom_point() +
       scale_color_viridis_c()+
       labs(title="X-to-autosomal coverage ratio all samples 100kb median", x="Sample name", y="X-to-autosomal coverage ratio") +
       theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
       theme_bw(base_size = 10) +
-      ylim(0.1,2) +
-      coord_flip()
+      ylim(0.25,2.75) +
+      scale_x_discrete(guide=guide_axis(n.dodge=2)) +
+      coord_flip() +
+      facet_grid(population~., drop = TRUE, scales = "free", space = "free")
+
+# note: added a 0.3 correction factor as the samples are shift to the right. Suggests a higher coverage on X than expected. Not sure what that means....
+
 ggsave("plot_x-to-autosome_ratio_sexdet_all.png")
 ggsave("plot_x-to-autosome_ratio_sexdet_all.pdf",height=10, width=7, useDingbats=FALSE)
 
 
+library(tidyverse)
 
+sex <- data %>%
+  group_by(population) %>%
+    summarize(
+      male = sum(x_cov_median/autosome_cov_median*2-0.3<=1.25),
+      female = sum(x_cov_median/autosome_cov_median*2-0.3>=1.75)
+      )
 
+sex
+
+  population   male female
+  <chr>       <int>  <int>
+1 Parent          3      7
+2 USRKF_ALD       1      0
+3 USRKF_HIS       1      1
+4 USRKF_KRU       2      1
+5 USRKF_OBE       3      3
+6 XQTL_DR_RES    21     21
+7 XQTL_DR_SUS   106    113
 ```
+- fairly equal male to female ratios overall
