@@ -123,90 +123,198 @@ done < samples.list
 
 
 
-## extract Kraken data
+
+
+
+
+## Variant calling
+
+
 
 ```bash
-cd /lustre/scratch125/pam/teams/team333/sd21/haemonchus_contortus/QTL/05_ANALYSIS/KRAKEN 
+cd /lustre/scratch125/pam/teams/team333/sd21/haemonchus_contortus/QTL
 
-cp ../../lanes_samples.list .
+find ~+ -type f -name '*.bam' | sort -V | grep -v "BLANK" | grep -v "Control" > 04_VARIANTS/bam.list
 
-# pull kraken qc reports
-cat lanes_samples.list | cut -c-7 | sort | uniq | while read -r LANE; do
-     pf qc --type lane --id ${LANE} --symlink ./ --rename; 
+cd /lustre/scratch125/pam/teams/team333/sd21/haemonchus_contortus/QTL/04_VARIANTS/
+
+./run_gatk.sh
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#run_genotyping.sh 
+
+export PREFIX=HCON_QTL  # prefix for output files
+export REFERENCE=/nfs/users/nfs_s/sd21/lustre_link/haemonchus_contortus/QTL/01_REFERENCE/HAEM_V4_final.chr.fa  # path to reference genome
+export BAM_LIST=/lustre/scratch125/pam/teams/team333/sd21/haemonchus_contortus/QTL/04_VARIANTS/bam.list2  # path to list of BAM files
+
+# Load GATK module
+module load gatk/4.1.4.1
+
+
+export WD=/lustre/scratch125/pam/teams/team333/sd21/haemonchus_contortus/QTL/04_VARIANTS/gatk_hc_HCON_QTL
+
+# Define file locations
+export LOG_FILES="${WD}/LOG_FILES"  # directory for log files
+export REFERENCE_FILES="${WD}/REFERENCE_FILES"  # directory for reference files
+export GATK_HC_GVCFs="${WD}/GATK_HC_GVCFs"  # directory for GATK HC GVCF files
+export GATK_HC_MERGED="${WD}/GATK_HC_MERGED"  # directory for merged haplotype caller files
+
+# Create directories if they don't exist
+[ -d ${LOG_FILES} ] || mkdir -p ${LOG_FILES}
+[ -d ${REFERENCE_FILES} ] || mkdir -p ${REFERENCE_FILES}
+[ -d ${GATK_HC_GVCFs} ] || mkdir -p ${GATK_HC_GVCFs}
+[ -d ${GATK_HC_MERGED} ] || mkdir -p ${GATK_HC_MERGED}
+
+
+
+# Save current script in run folder to reproduce the exact output
+cp ${PWD}/run_gatk_hc.sh ${PWD}/gatk_hc_${PREFIX}/commands.$(date -Iminutes).txt
+
+
+#-------------------------------------------------------------------------------
+### 03. GenomicsDBImport
+#-------------------------------------------------------------------------------
+func_GenomicsDBImport() {
+
+ls -1 ${GATK_HC_GVCFs}/*complete/*gz > ${GATK_HC_MERGED}/gvcf.list
+
+[ -d ${GATK_HC_MERGED}/LOGFILES ] || mkdir -p ${GATK_HC_MERGED}/LOGFILES
+
+
+n=1
+for SEQUENCE in ${REFERENCE_FILES}/REFsplit*list; do
+
+    SEQUENCE=$( echo ${SEQUENCE} | awk -F '/' '{print $NF}' )
+
+     mkdir ${GATK_HC_MERGED}/.tmp_${SEQUENCE}
+
+    echo -e "gatk GenomicsDBImport --genomicsdb-workspace-path genomicsdb_${SEQUENCE} -R ${REFERENCE_FILES}/REF.fa --intervals ${REFERENCE_FILES}/${SEQUENCE} --reader-threads 20 --batch-size 100 \\" > ${GATK_HC_MERGED}/run_GenomicsDBImport.tmp.job_${n}
+    while read SAMPLE; do
+        echo -e "--variant ${SAMPLE} \\" >> ${GATK_HC_MERGED}/run_GenomicsDBImport.tmp.job_${n};
+   done < ${GATK_HC_MERGED}/gvcf.list
+   echo -e "--tmp-dir ${GATK_HC_MERGED}/.tmp_${SEQUENCE}" >> ${GATK_HC_MERGED}/run_GenomicsDBImport.tmp.job_${n};
+   let "n+=1";
 done
 
-# fix the lanes and samples file
-sed -i 's/_/#/2' lanes_samples.list
+chmod a+x ${GATK_HC_MERGED}/run_GenomicsDBImport.tmp.job_*
 
-# copy the symlinked file and change the name of the file from lane to sample name
-cat lanes_samples.list | while read -r LANE NAME; do
-     cp ${LANE}_kraken.report ${NAME}_kraken.report;
+# setup job conditions
+JOBS=$( ls -1 ${GATK_HC_MERGED}/run_GenomicsDBImport.tmp.job_* | wc -l )
+ID="U$(date +%s)"
+
+#submit job array to run GenomicsDBImport
+bsub -q long -R'span[hosts=1] select[mem>30000] rusage[mem=30000]' -n 20 -M30000 -J "gatk_GenomicsDBImport_[1-$JOBS]%100" -e "${GATK_HC_MERGED}/LOGFILES/gatk_GenomicsDBImport_[1-$JOBS].e" -o "${GATK_HC_MERGED}/LOGFILES/gatk_GenomicsDBImport_[1-$JOBS].o" "${GATK_HC_MERGED}/run_GenomicsDBImport.tmp.job_\$LSB_JOBINDEX"
+
+rm ${GATK_HC_MERGED}/MERGE_ARRAY_FINISHED
+bsub -w "done(gatk_GenomicsDBImport_)" -q normal -R'span[hosts=1] select[mem>100] rusage[mem=100]' -n 1 -M100 -J "gatk_GenomicsDBImport_finish" -e "${GATK_HC_MERGED}/LOGFILES/gatk_GenomicsDBImport_finish.e" -o "${GATK_HC_MERGED}/LOGFILES/gatk_GenomicsDBImport_finish.o" "touch ${GATK_HC_MERGED}/GenomicsDBImport_FINISHED"
+
+until [ -f "${GATK_HC_MERGED}/GenomicsDBImport_FINISHED" ]
+do
+     sleep 10
 done
 
-# fix the header by removing the first two lines - only a fix for Sanger kraken reports
-for i in *_kraken.report; do 
-     sed -i '1,2d' ${i}; 
-     done
+}
 
-# remove the symlinked files
-rm 3*
+export -f func_GenomicsDBImport
 
-# make a multiqc report of the kraken data
-multiqc .
-```
+#-------------------------------------------------------------------------------
 
 
+#-------------------------------------------------------------------------------
+### 04. Genotype GVCFs
+#-------------------------------------------------------------------------------
+
+func_genotype_gvcfs() {
+
+# split each chromosome up into separate jobs, and run genotyping on each individually.
+n=1
+for SEQUENCE in ${REFERENCE_FILES}/REFsplit*list; do
+    SEQUENCE=$( echo ${SEQUENCE} | awk -F '/' '{print $NF}' )
+    echo -e "gatk GenotypeGVCFs \
+    -R ${REFERENCE_FILES}/REF.fa \
+    -V gendb://genomicsdb_${SEQUENCE} \
+    -O ${GATK_HC_MERGED}/${SEQUENCE}.cohort.tmp.vcf.gz -G StandardAnnotation -G AS_StandardAnnotation" > ${GATK_HC_MERGED}/run_hc_genotype.tmp.job_${n};
+    let "n+=1";
+done
+
+chmod a+x ${GATK_HC_MERGED}/run_hc_genotype*
+
+# setup job conditions
+JOBS=$( ls -1 ${GATK_HC_MERGED}/run_hc_genotype* | wc -l )
+ID="U$(date +%s)"
+
+bsub -q long -R'span[hosts=1] select[mem>20000] rusage[mem=20000]' -n 6 -M20000 -J "gatk_genotype_cohort_gvcf_[1-$JOBS]" -e "${GATK_HC_MERGED}/LOGFILES/gatk_genotype_cohort_gvcf_[1-$JOBS].e" -o "${GATK_HC_MERGED}/LOGFILES/gatk_genotype_cohort_gvcf_[1-$JOBS].o" "${GATK_HC_MERGED}/run_hc_genotype.tmp.job_*\$LSB_JOBINDEX"
+
+rm ${GATK_HC_MERGED}/GENOTYPE_ARRAY_FINISHED
+bsub -w "done(gatk_genotype_cohort_gvcf_)" -q normal -R'span[hosts=1] select[mem>100] rusage[mem=100]' -n 1 -M100 -J "gatk_genotype_cohort_gvcf_finish" -e "${GATK_HC_MERGED}/LOGFILES/gatk_genotype_cohort_gvcf_finish.e" -o "${GATK_HC_MERGED}/LOGFILES/gatk_genotype_cohort_gvcf_finish.o" "touch ${GATK_HC_MERGED}/GENOTYPE_ARRAY_FINISHED"
+
+until [ -f "${GATK_HC_MERGED}/GENOTYPE_ARRAY_FINISHED" ]
+do
+     sleep 10
+done
+
+}
+
+export -f func_genotype_gvcfs
+
+
+
+#-------------------------------------------------------------------------------
+### 05. Finish making VCF and cleanup
+#-------------------------------------------------------------------------------
+
+
+func_finish_vcf() {
+
+    #
+    ls ${GATK_HC_MERGED}/*.cohort.tmp.vcf.gz > ${GATK_HC_MERGED}/cohort.vcf.list
+
+    # concatenate the vcf files in the list
+    vcf-concat --files ${GATK_HC_MERGED}/cohort.vcf.list > ${GATK_HC_MERGED}/${PREFIX}.cohort.$(date -I).vcf
+
+    # Compress the combined VCF file with bgzip
+    bgzip -f ${GATK_HC_MERGED}/${PREFIX}.cohort.$(date -I).vcf
+
+    # Create a tabix index for the compressed combined VCF file
+    tabix -f ${GATK_HC_MERGED}/${PREFIX}.cohort.$(date -I).vcf.gz
+
+    # Remove all files in the directory specified by GATK_HC_MERGED that match the pattern *tmp*
+    rm ${GATK_HC_MERGED}/*tmp*
+
+}
+
+export -f func_finish_vcf
 
 
 
 
-## PCA of nuclear and mitochondrial variants
 
-```bash
-cd /lustre/scratch125/pam/teams/team333/sd21/haemonchus_contortus/QTL/05_ANALYSIS/PCA
-
-# mtDNA
-ln -s ../../04_VARIANTS/gatk_hc_test/GATK_HC_MERGED/hcontortus_chr_mtDNA_arrow_pilon.raw.vcf.gz
-
-```
+#-------------------------------------------------------------------------------
+# running the pipeline
+#-------------------------------------------------------------------------------
 
 
 
-```R
-library(tidyverse)
-library(SNPRelate)
 
+# func_merge_gvcf
+bsub -E 'test -e /nfs/users/nfs_s/sd21' -R "select[mem>50000] rusage[mem=50000]" -q long -M50000 -n20 -o ${LOG_FILES}/gatk_03_GenomicsDBImport.o -e ${LOG_FILES}/gatk_03_GenomicsDBImport.e -J gatk_03_GenomicsDBImport_${PREFIX} func_GenomicsDBImport
 
-vcf.fn <- "hcontortus_chr_mtDNA_arrow_pilon.raw.vcf.gz"
+# func_genotype_gvcfs
+bsub -w "done(gatk_03_GenomicsDBImport_${PREFIX})" -E 'test -e /nfs/users/nfs_s/sd21' -R "select[mem>50000] rusage[mem=50000]" -q long -M50000 -n20 -o ${LOG_FILES}/gatk_04_genotype_gvcfs.o -e ${LOG_FILES}/gatk_04_genotype_gvcfs.e -J gatk_04_genotype_gvcfs_${PREFIX} func_genotype_gvcfs
 
-snpgdsVCF2GDS(vcf.fn, "mtDNA.gds", method="biallelic.only")
+# func_finish_vcf
+bsub -w "done(gatk_04_genotype_gvcfs_${PREFIX})" -E 'test -e /nfs/users/nfs_s/sd21' -R "select[mem>1000] rusage[mem=1000]" -q long -M1000 -n1 -o ${LOG_FILES}/gatk_05_finish_vcf.o -e ${LOG_FILES}/gatk_05_finish_vcf.e -J gatk_05_finish_vcf_${PREFIX} func_finish_vcf
 
-snpgdsSummary("mtDNA.gds")
-
-genofile <- snpgdsOpen("mtDNA.gds")
-
-pca <- snpgdsPCA(genofile, num.thread=2, autosome.only=F)
-
-
-
-pc.percent <- pca$varprop*100
-head(round(pc.percent, 2))
-
-data <- data.frame(sample.id = pca$sample.id,
-    EV1 = pca$eigenvect[,1],    # the first eigenvector
-    EV2 = pca$eigenvect[,2],    # the second eigenvector
-    stringsAsFactors = FALSE)
-head(data)
-
-
-population <- read.table("sample-id_populations.txt", header=T, sep="\t") 
-
-data <- inner_join(data, population, by="sample.id")
-
-
-ggplot(data, aes(EV1, EV2, colour=population)) + 
-     geom_point() +
-     labs(title="mitochondrial_variants",
-          x = paste0("PC1 variance: ",round(pca$varprop[1]*100,digits=2),"%"),
-          y = paste0("PC2 variance: ",round(pca$varprop[2]*100,digits=2),"%"))
-```

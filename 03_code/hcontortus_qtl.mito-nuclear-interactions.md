@@ -150,7 +150,7 @@ wc -l *_sampleIDs_*list
 # make a populations file for pixy
 >mtDNA-groups_pixy_populations.list
 for i in *_sampleIDs_*list; do
-    name=$(echo ${i} | awk -F '[_\.]' '{print $4}');
+    name=$(echo ${i} | awk -F '[_\.]' '{print $2"_"$4}');
     awk -v name=$name '{print $1,name}' OFS="\t" ${i} >> mtDNA-groups_pixy_populations.list; 
 done
 
@@ -168,7 +168,40 @@ ln -s ../PARENT_BIAS/hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz.tbi
 ### TESTING - a couple of samples were missing from the old vcf, so had to remove them from the pop list
 cat mtDNA-groups_pixy_populations.list | grep -wv "XQTL_DR_SUS_L1_P3B1" | grep -vw "XQTL_DR_SUS_L1_P3D6" | grep -vw "XQTL_DR_SUS_L1_P1C4" > mtDNA-groups_pixy_populations.list2
 
-bsub.py 10 pixy_mtDNAgroups_dxy "pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations.list2 --bypass_invariant_check yes --window_size 10000"
+grep "all" mtDNA-groups_pixy_populations.list2 > mtDNA-groups_pixy_populations_all.list
+grep "susceptible" mtDNA-groups_pixy_populations.list2 > mtDNA-groups_pixy_populations_susceptible.list
+grep "resistant" mtDNA-groups_pixy_populations.list2 > mtDNA-groups_pixy_populations_resistant.list
+
+
+
+bsub.py 10 pixy_mtDNAgroups_dxy_all "pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_all.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_all"
+
+bsub.py 10 pixy_mtDNAgroups_dxy_sus "pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_susceptible.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_susceptible"
+
+bsub.py 10 pixy_mtDNAgroups_dxy_res "pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_resistant.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_resistant"
+
+
+
+bsub.py 10 pixy_mtDNAgroups_dxy_all "pixy --vcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_all.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_all_chr1"
+
+bsub.py 10 pixy_mtDNAgroups_dxy_sus "pixy --vcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_susceptible.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_susceptible_chr1"
+
+bsub.py 10 pixy_mtDNAgroups_dxy_res "pixy --vcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_resistant.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_resistant_chr1"
+
+
+bsub.py 10 pixy_mtDNAgroups_fst_chr1_all "pixy --vcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz --stats fst --populations mtDNA-groups_pixy_populations_all.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_all_chr1"
 ```
 
-Exception: ('[pixy] ERROR: the following samples are listed in the population file but not in the VCF: ', ['XQTL_DR_SUS_L1_P3B1', 'XQTL_DR_SUS_L1_P3D6', 'XQTL_DR_SUS_L1_P1C4'])
+
+
+
+```R
+library(tidyverse)
+
+
+data <- read.table("mtDNA-groups_susceptible_dxy.txt", header=T)
+
+ggplot(data, aes(window_pos_1, avg_dxy)) + geom_point(size=0.5) + facet_grid(pop1~pop2)
+
+```
+
