@@ -64,7 +64,7 @@ ggplot(data, aes(EV1, EV2, colour=population, label=sample.id)) +
           y = paste0("PC2 variance: ",round(pca$varprop[2]*100,digits=2),"%"))
 
 ggsave("figure_pca_mDNA_snps_allsamples.png")
-ggsave("figure_pca_mDNA_snps_allsamples.pdf", height=5, width=6, units="in")
+ggsave("figure_pca_mDNA_snps_allsamples.pdf", height=4.5, width=6, units="in")
 
 
 
@@ -103,7 +103,7 @@ ggplot(data, aes(EV1, EV2, colour=population, label=sample.id)) +
           y = paste0("PC2 variance: ",round(pca$varprop[2]*100,digits=2),"%"))
 
 ggsave("figure_pca_mDNA_snps_xqtl_samples.png")
-ggsave("figure_pca_mDNA_snps_xqtl_samples.pdf", height=5, width=6, units="in")
+ggsave("figure_pca_mDNA_snps_xqtl_samples.pdf", height=4.5, width=6, units="in")
 
 ```
 ![](../04_analysis/figure_pca_mDNA_snps_allsamples.png)
