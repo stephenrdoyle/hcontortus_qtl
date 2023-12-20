@@ -14,6 +14,7 @@ cat out.imiss | awk '{if($5<0.25) print $1}' > keep.list
 
 vcftools --gzvcf mito.vcf --keep keep.list --max-missing 1 --remove-indels --recode --out hcontortus_chr_mtDNA_arrow_pilon.missindv0.1.maxmiss1.n278
 
+
 #> After filtering, kept 254 out of 277 Individuals
 #> After filtering, kept 151 out of a possible 632 Sites
 
