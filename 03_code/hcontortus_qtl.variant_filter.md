@@ -43,6 +43,15 @@ cat *sam | ~/lustre_link/software/SNP_CALLING/seqbility-20091110/gen_raw_mask.pl
 5698971, 30981882, 16144544, 230613911, 245124955
 0.830322, 0.888450, 0.882569
 
+# make bed files per chromosome of the category 3 positions,
+module load ISG/python/2.7.16
+
+python ~/lustre_link/haemonchus_contortus/QTL/04_VARIANTS/FILTERED/SNPABLE/makeMappabilityMask.py
+
+zcat *.mask.bed.gz | sort -k1,1V -k2,2n > snpable.mask.bed
+
+# clean up
+rm *sam *sai x*
 
 # position categories
 # c=3: the majortiy of overlapping 35-mers are mapped uniquely and without 1-mismatch (or 1-difference, depending on the BWA command line) hits.
@@ -65,8 +74,36 @@ SNPtype: 2
 SNPtype: 3
 230613911
 
+# clean up
+rm *sam *sai x*
+
+
+
+
+# check coverage of kept regions
+
+samtools faidx HAEM_V4_final.chr.fa
+
+cat HAEM_V4_final.chr.fa.fai | cut -f1,2 > HAEM_V4_final.chr.genome
+
+bedtools makewindows -g HAEM_V4_final.chr.genome -w 100000 > HAEM_V4_final.chr.100k.bed
+
+bedtools coverage -a HAEM_V4_final.chr.100k.bed -b snpable.mask.bed > HAEM_V4_final.chr.100k.snpable.coverage
 ```
 
+```R
+library(tidyverse)
+
+data <- read.table("HAEM_V4_final.chr.100k.snpable.coverage", header=F)
+
+ggplot(data, aes(V2,V7)) + 
+    geom_point() + 
+    facet_grid(V1~.) +
+    labs(title="SNPable mask coverage of genome", x="Genome position", y="Fraction of 100kb window retained after masking")
+
+ggsave("figure_snpable_mask_coverage_of_genome.png")
+```
+![](../04_analysis/figure_snpable_mask_coverage_of_genome.png)
 
 
 
@@ -493,3 +530,18 @@ bsub.py --done "filter_nuclear_GT" 1 filter_nuclear_GT2 \
 --set-filtered-gt-to-nocall \
 --output ${VCF%.vcf.gz}.nuclearALL.DPfilterNoCall.vcf.gz"
 
+
+
+
+vcftools \
+--vcf ${VCF%.vcf.gz}.nuclearALL.DPfilterNoCall.vcf \
+--remove-filtered-geno-all \
+--remove-filtered-all \
+--bed ${WORKING_DIR}/01_REF/SNPABLE/mask.bed \
+--min-alleles 2 \
+--max-alleles 2 \
+--hwe 1e-06 \
+--maf 0.02 \
+--recode \
+--recode-INFO-all \
+--out ${VCF%.vcf.gz}.nuclear_variants.final
