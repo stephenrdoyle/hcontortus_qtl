@@ -1,15 +1,18 @@
 # PCA of nuclear and mitochondrial variants
 
+### Stephen Doyle
+
 ```bash
 cd /lustre/scratch125/pam/teams/team333/sd21/haemonchus_contortus/QTL/05_ANALYSIS/PCA
-
-# mtDNA
-ln -s ../../04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.mito_variants.final.recode.vcf mito.vcf
 
 ```
 
 ## Filter variants to keep subsets of samples
 ```bash
+
+# mtDNA variants
+ln -s ../../04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.mito_variants.final.recode.vcf mito.vcf
+
 # group 1 - all samples with <0.25 missingness
 vcftools --vcf mito.vcf --missing-indv
 
@@ -31,7 +34,7 @@ vcftools --gzvcf mito.vcf   --keep keep.XQTL.list  --max-missing 1 --remove-inde
 ```
 
 
-
+## Make some plots
 ```R
 library(tidyverse)
 library(SNPRelate)
@@ -72,12 +75,13 @@ ggplot(data, aes(EV1, EV2, colour=population, label=sample.id)) +
 ggsave("figure_pca_mDNA_snps_allsamples.png")
 ggsave("figure_pca_mDNA_snps_allsamples.pdf", height=4.5, width=6, units="in")
 
+```
+![](../04_analysis/figure_pca_mDNA_snps_allsamples.png)
 
 
 
 
-
-
+```R
 # PCA using just the F5 generation and susceptible parental samples
 vcf.fn <- "hcontortus_chr_mtDNA_arrow_pilon.missindv0.1.maxmiss1.n256.xqtl.recode.vcf" 
 
@@ -112,7 +116,7 @@ ggsave("figure_pca_mDNA_snps_xqtl_samples.png")
 ggsave("figure_pca_mDNA_snps_xqtl_samples.pdf", height=4.5, width=6, units="in")
 
 ```
-![](../04_analysis/figure_pca_mDNA_snps_allsamples.png)
+
 ![](../04_analysis/figure_pca_mDNA_snps_xqtl_samples.png)
 
 
