@@ -73,6 +73,8 @@ SNPtype: 2
 SNPtype: 3
 230613911
 
+
+283439308
 # clean up
 rm *sam *sai x*
 
