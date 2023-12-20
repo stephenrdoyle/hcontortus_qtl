@@ -1,7 +1,6 @@
 # hcontortus_qtl: variant filtering
 
-
-
+### Stephen Doyle
 
 
 ## SNPable
@@ -463,6 +462,8 @@ ${VCF%.vcf.gz}.mitoINDELs.vcf"
 # done
 ```
 
+## merge variant sets
+```bash
 module load gatk/4.1.4.1
 
 WORKING_DIR=/nfs/users/nfs_s/sd21/lustre_link/haemonchus_contortus/QTL/04_VARIANTS/FILTERED
@@ -478,9 +479,13 @@ bsub.py 1 merge_nuclear_variants "gatk MergeVcfs \
 --INPUT ${VCF%.vcf.gz}.nuclearSNPs.filtered.vcf.gz \
 --INPUT ${VCF%.vcf.gz}.nuclearINDELs.filtered.vcf.gz \
 --OUTPUT ${VCF%.vcf.gz}.nuclearALL.filtered.vcf.gz"
+```
 
-
-
+## annotate low coverage variants
+- mtDNA: DP < 5
+- nuclear: DP < 3 
+```bash
+# mtDNA - annotate low coverage variants
 bsub.py 1 filter_mito_GT \
 "gatk VariantFiltration \
 --reference ${REFERENCE} \
@@ -489,6 +494,7 @@ bsub.py 1 filter_mito_GT \
 --genotype-filter-name "DP_lt5" \
 --output ${VCF%.vcf.gz}.mitoALL.DPfiltered.vcf.gz"
 
+# mtDNA - remove genotypes of low coverage variants
 bsub.py --done "filter_mito_GT" 1 filter_mito_GT2 \
 "gatk SelectVariants \
 --reference ${REFERENCE} \
@@ -496,25 +502,7 @@ bsub.py --done "filter_mito_GT" 1 filter_mito_GT2 \
 --set-filtered-gt-to-nocall \
 --output ${VCF%.vcf.gz}.mitoALL.DPfilterNoCall.vcf.gz"
 
-# filter mitochondrial variants
-vcftools \
---gzvcf ${VCF%.vcf.gz}.mitoALL.DPfilterNoCall.vcf.gz \
---remove-filtered-geno-all \
---remove-filtered-all \
---min-alleles 2 \
---max-alleles 2 \
---recode \
---recode-INFO-all \
---out ${VCF%.vcf.gz}.mito_variants.final
-
-
-
-
-
-
-
-
-
+# nuclear - annotate low coverage variants
 bsub.py 1 filter_nuclear_GT \
 "gatk VariantFiltration \
 --reference ${REFERENCE} \
@@ -523,25 +511,69 @@ bsub.py 1 filter_nuclear_GT \
 --genotype-filter-name "DP_lt3" \
 --output ${VCF%.vcf.gz}.nuclearALL.DPfiltered.vcf.gz"
 
+# nuclear - remove genotypes of low coverage variants
 bsub.py --done "filter_nuclear_GT" 1 filter_nuclear_GT2 \
 "gatk SelectVariants \
 --reference ${REFERENCE} \
 --variant ${VCF%.vcf.gz}.nuclearALL.DPfiltered.vcf.gz \
 --set-filtered-gt-to-nocall \
 --output ${VCF%.vcf.gz}.nuclearALL.DPfilterNoCall.vcf.gz"
+```
 
 
-
-
+# apply final filters
+- remove filtered variants
+- keep sites within snpable mask
+- keep bialleleic SNPs
+```bash
+# filter mitochondrial variants
 vcftools \
---vcf ${VCF%.vcf.gz}.nuclearALL.DPfilterNoCall.vcf \
+--gzvcf ${VCF%.vcf.gz}.mitoALL.DPfilterNoCall.vcf.gz \
 --remove-filtered-geno-all \
 --remove-filtered-all \
---bed ${WORKING_DIR}/01_REF/SNPABLE/mask.bed \
+--bed /nfs/users/nfs_s/sd21/lustre_link/haemonchus_contortus/QTL/04_VARIANTS/FILTERED/SNPABLE/snpable.mask.bed \
 --min-alleles 2 \
 --max-alleles 2 \
---hwe 1e-06 \
---maf 0.02 \
+--maf 0.01 \
+--recode \
+--recode-INFO-all \
+--out ${VCF%.vcf.gz}.mito_variants.final
+
+#> After filtering, kept 632 out of a possible 2730 Sites
+
+#--- mito SNPs
+vcftools --vcf HCON_QTL.cohort.2023-12-12.n278.mito_variants.final.recode.vcf --remove-indels
+#> After filtering, kept 277 out of 277 Individuals
+#> After filtering, kept 561 out of a possible 632 Sites
+
+#--- mito INDELs
+vcftools --vcf HCON_QTL.cohort.2023-12-12.n278.mito_variants.final.recode.vcf --keep-only-indels
+# After filtering, kept 277 out of 277 Individuals
+# After filtering, kept 71 out of a possible 632 Sites
+
+
+
+# filter nuclear variants
+vcftools \
+--gzvcf ${VCF%.vcf.gz}.nuclearALL.DPfilterNoCall.vcf.gz \
+--remove-filtered-geno-all \
+--remove-filtered-all \
+--bed /nfs/users/nfs_s/sd21/lustre_link/haemonchus_contortus/QTL/04_VARIANTS/FILTERED/SNPABLE/snpable.mask.bed \
+--min-alleles 2 \
+--max-alleles 2 \
+--maf 0.01 \
 --recode \
 --recode-INFO-all \
 --out ${VCF%.vcf.gz}.nuclear_variants.final
+
+#> After filtering, 
+
+#--- nuclear SNPs
+vcftools --vcf HCON_QTL.cohort.2023-12-12.n278.mito_variants.final.recode.vcf --remove-indels
+#> After filtering, kept 277 out of 277 Individuals
+#> After filtering, kept 561 out of a possible 632 Sites
+
+#--- nuclear INDELs
+vcftools --vcf HCON_QTL.cohort.2023-12-12.n278.mito_variants.final.recode.vcf --keep-only-indels
+
+```
