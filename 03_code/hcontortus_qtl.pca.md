@@ -121,7 +121,37 @@ ggsave("figure_pca_mDNA_snps_xqtl_samples.pdf", height=4.5, width=6, units="in")
 
 
 
+## Filter variants to keep subsets of samples
+```bash
 
+# mtDNA variants
+
+ln -s ../../04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.autosomal_variants.recode.vcf autosome.vcf
+
+# group 1 - all samples with <0.25 missingness
+vcftools --vcf autosome.vcf --missing-indv
+
+cat out.imiss | awk '{if($5<0.5) print $1}' > keep.list
+
+vcftools --gzvcf autosome.vcf --keep keep.list --max-missing 0.8 --remove-indels --recode --out autosome.all
+
+#> After filtering, kept 254 out of 277 Individuals
+#> After filtering, kept 151 out of a possible 632 Sites
+
+
+# group 1 - XQTL only samples and the susceptible parental population
+grep "XQTL\|MHCO3\|GB_ISE" keep.list > keep.XQTL.list
+
+vcftools --gzvcf mito.vcf   --keep keep.XQTL.list  --max-missing 1 --remove-indels --recode --out autosome.qtl
+
+#> After filtering, kept 236 out of 277 Individuals
+#> After filtering, kept 284 out of a possible 632 Sites
+```
+
+
+
+
+ln -s ../../04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.autosomal_variants.recode.vcf
 
 ## nuclear variants
 ```R

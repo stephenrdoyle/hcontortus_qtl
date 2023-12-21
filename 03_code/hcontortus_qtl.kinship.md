@@ -2,7 +2,15 @@
 
 ### Stephen Doyle
 
+
+
+
+
 ```bash
+cd /nfs/users/nfs_s/sd21/lustre_link/haemonchus_contortus/QTL/05_ANALYSIS/KINSHIP
+
+ln -s ../../04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.autosomal_variants.recode.vcf
+
 # generate kinship coefficients from the autosomal whole genome data
 vcftools \
 --vcf HCON_QTL.cohort.2023-12-12.n278.autosomal_variants.recode.vcf \
@@ -30,7 +38,9 @@ cat HCON_QTL.cohort.2023-12-12.n278.autosomal_variants.relatedness2 |\
 
 ```R
 library(ggraph)
+library(igraph)
 library(tidygraph)
+library(tidyverse)
 
 
 nodes <- read.table("metadata.txt", header=T, sep="\t")

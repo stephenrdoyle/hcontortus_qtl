@@ -164,6 +164,7 @@ ggsave("MHCO3_v_MHCO18_poolsfrequency.0.9freq.pos.png")
 ![](../04_analysis/MHCO3_v_MHCO18_poolsfrequency.0.8freq.pos.png)
 ![](../04_analysis/MHCO3_v_MHCO18_poolsfrequency.0.9freq.pos.png)
 
+
 - from the plots, it is clear that these variants that discriminate MHco3 and MHco18 are not randomly distributed
     - knowing where the QTL for BZ, LEV, and IVM are from the XQTL paper (Doyle 2022 Cell Rep, it is clear from these data there are enriched regions of "fixed" alleles
         - IVM - 37.5 on chr 5, possibly start of chr2
@@ -174,6 +175,10 @@ ggsave("MHCO3_v_MHCO18_poolsfrequency.0.9freq.pos.png")
         - X chromosome a good example - note, might be more impacted by coverage cutoffs
 
 - will stick with the 0.33X coverage cutoffs and diff of 0.8
+
+
+
+
 
 
 ```bash
@@ -188,72 +193,89 @@ awk '{print $1,$2,$8,$7,$6,$5,$6-$8}' OFS="\t" MHCO3_v_MHCO18_poolsfrequency.csv
 
 
 
+## Extract allele frequency from susceptible and resistant populations
+```bash
 
-########  TESTING  #########
-
-ln -s ../../04_VARIANTS/gatk_hc_test/GATK_HC_MERGED/hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz
-ln -s ../../04_VARIANTS/gatk_hc_test/GATK_HC_MERGED/hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz
+ln -s ../../04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf
 
 XQTL_resistant.samples.keep_list
 XQTL_susceptible.samples.keep_list - n = 219
 
 # XQTL_susceptible - freq
 vcftools \
-    --gzvcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz \
+    --vcf HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf \
     --keep XQTL_susceptible.samples.keep_list \
     --positions MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions \
     --min-alleles 2 \
     --max-alleles 2 \
     --freq \
-    --out chr5_XQTL_susceptible_diff0.8_biased_variants
+    --out XQTL_susceptible_diff0.8_biased_variants
 
-sed -i -e 's/:/\t/g' -e '1d' chr5_XQTL_susceptible_diff0.8_biased_variants.frq
-
-
-vcftools \
-    --gzvcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz \
-    --keep XQTL_susceptible.samples.keep_list \
-    --positions MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions \
-    --min-alleles 2 \
-    --max-alleles 2 \
-    --freq \
-    --out chr1_XQTL_susceptible_diff0.8_biased_variants
-
-sed -i -e 's/:/\t/g' -e '1d' chr1_XQTL_susceptible_diff0.8_biased_variants.frq
-
-
-
-
-
-
-
+sed -i -e 's/:/\t/g' -e '1d' XQTL_susceptible_diff0.8_biased_variants.frq
 
 
 
 
 # XQTL_resistant - freq
 vcftools \
-    --gzvcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz \
+    --vcf HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf \
     --keep XQTL_resistant.samples.keep_list \
     --positions MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions \
     --min-alleles 2 \
     --max-alleles 2 \
     --freq \
-    --out chr5_XQTL_resistant_diff0.8_biased_variants
+    --out XQTL_resistant_diff0.8_biased_variants
 
-sed -i -e 's/:/\t/g' -e '1d' chr5_XQTL_resistant_diff0.8_biased_variants.frq
+sed -i -e 's/:/\t/g' -e '1d' XQTL_resistant_diff0.8_biased_variants.frq
 
 
-vcftools \
-    --gzvcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz \
-    --keep XQTL_resistant.samples.keep_list \
-    --positions MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions \
-    --min-alleles 2 \
-    --max-alleles 2 \
-    --freq \
-    --out chr1_XQTL_resistant_diff0.8_biased_variants
+```
 
-sed -i -e 's/:/\t/g' -e '1d' chr1_XQTL_resistant_diff0.8_biased_variants.frq
+
+
+```R
+
+library(tidyverse)
+library(zoo)
+
+data_sus <- read.table("XQTL_susceptible_diff0.8_biased_variants.frq", header=F, sep="\t")
+data_sus$population <- "XQTL_susceptible"
+
+data_res <- read.table("XQTL_resistant_diff0.8_biased_variants.frq", header=F, sep="\t")
+data_res$population <- "XQTL_resistant"
+
+data <- bind_rows(data_sus, data_res)
+
+a<- ggplot(data, aes(V2, V8, col=population)) +
+    geom_point(size=0.1) + 
+    facet_grid(.~V1) +
+    theme_bw() 
+
+
+data <- bind_rows(data_sus, data_res)
+data <- data %>% mutate(rolling_avg = rollmean(V8, k=50, fill=NA, align='right'))
+
+quantile_range <- data %>% reframe(enframe(quantile(rolling_avg, c(0.05, 0.95), na.rm=T), "quantile", "freq"))
+
+ggplot(data) + 
+    geom_line(aes(V2/1e6, rolling_avg, col=population), size=0.5) + 
+    ylim(0,1) + 
+    facet_grid(V1~.) +
+    geom_hline(yintercept = quantile_range$freq, linetype="dashed") +
+    geom_hline(yintercept = 0.5) +
+    theme_bw() +
+    labs(x="Genomic position (Mb)", y="Parental allele frequency bias: Susceptible 0 <> 1 Resistant" )
+```
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -333,27 +355,7 @@ done < genotype_matrix >> genotype_matrix.chisquare
 
 
 
-R
-library(tidyverse)
-library(zoo)
 
-data_sus <- read.table("chr5_XQTL_susceptible_diff0.8_biased_variants.frq", header=F)
-data_sus$population <- "XQTL_susceptible"
-
-data_res <- read.table("chr5_XQTL_resistant_diff0.8_biased_variants.frq", header=F)
-data_res$population <- "XQTL_resistant"
-
-data <- bind_rows(data_sus, data_res)
-
-a<- ggplot(data, aes(V2, V8, col=population)) +
-    geom_point(size=0.1) + 
-    facet_grid(.~V1) +
-    theme_bw() 
-
-
-data <- bind_rows(data_sus, data_res)
-data <- data %>% mutate(rolling_avg = rollmean(V8, k=50, fill=NA, align='right'))
-ggplot() + geom_line(aes(data$V2, data$rolling_avg, col=data$population), size=1) + ylim(0,1) + geom_vline(xintercept=31521884)
 
 
 R
@@ -408,3 +410,10 @@ vcftools \
 pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --sites_file MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions --stats pi --populations XQTLsamples.keep_list.pixypop2 --bypass_invariant_check yes --window_size 1
 
 pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --sites_file MHCO3_v_MHCO18_diff0.8_biased_variants.keep-positions --stats dxy --populations XQTLsamples.keep_list.pixypop2 --bypass_invariant_check yes --window_size 1
+
+
+
+
+
+
+

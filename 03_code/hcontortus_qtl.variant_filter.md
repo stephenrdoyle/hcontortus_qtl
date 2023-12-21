@@ -571,11 +571,21 @@ vcftools \
 #> After filtering, 
 
 #--- nuclear SNPs
-vcftools --vcf HCON_QTL.cohort.2023-12-12.n278.mito_variants.final.recode.vcf --remove-indels
+vcftools --vcf HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf --remove-indels
 #> After filtering, kept 277 out of 277 Individuals
-#> After filtering, kept 561 out of a possible 632 Sites
+#> After filtering, kept 17255972 out of a possible 19875335 Sites
 
 #--- nuclear INDELs
-vcftools --vcf HCON_QTL.cohort.2023-12-12.n278.mito_variants.final.recode.vcf --keep-only-indels
+vcftools --vcf HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf --keep-only-indels
+#> After filtering, kept 277 out of 277 Individuals
+#> After filtering, kept 2619363 out of a possible 19875335 Sites
 
+
+
+# extract autosomal variants
+vcftools --vcf HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf --not-chr hcontortus_chr_mtDNA_arrow_pilon --not-chr hcontortus_chrX_Celeg_TT_arrow_pilon --recode --recode-INFO-all --out HCON_QTL.cohort.2023-12-12.n278.autosomal_variants
 ```
+
+
+rm *filtered*
+rm *DPfilter*
