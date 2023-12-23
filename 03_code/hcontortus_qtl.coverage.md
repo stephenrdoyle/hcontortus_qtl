@@ -67,10 +67,15 @@ ggplot(data, aes(sample_name, x_cov_median/autosome_cov_median*2-0.3, col=log10(
 
 # note: added a 0.3 correction factor as the samples are shift to the right. Suggests a higher coverage on X than expected. Not sure what that means....
 
-ggsave("plot_x-to-autosome_ratio_sexdet_all.png")
-ggsave("plot_x-to-autosome_ratio_sexdet_all.pdf",height=10, width=7, useDingbats=FALSE)
+ggsave("figure_x-to-autosome_ratio_sexdet_all.png")
+ggsave("figure_x-to-autosome_ratio_sexdet_all.pdf",height=10, width=7, useDingbats=FALSE)
+
+```
+![](../04_analysis/figure_x-to-autosome_ratio_sexdet_all.png)
 
 
+## summarise number of larvae per sex per group
+```R
 library(tidyverse)
 
 sex <- data %>%
