@@ -166,33 +166,25 @@ conda activate pixy
 
 
 
-ln -s ../../04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf
+ln -s /nfs/users/nfs_s/sd21/lustre_link/haemonchus_contortus/QTL/04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf.gz
+ln -s /nfs/users/nfs_s/sd21/lustre_link/haemonchus_contortus/QTL/04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf.gz.tbi
 
-### TESTING - a couple of samples were missing from the old vcf, so had to remove them from the pop list
-cat mtDNA-groups_pixy_populations.list | grep -wv "XQTL_DR_SUS_L1_P3B1" | grep -vw "XQTL_DR_SUS_L1_P3D6" | grep -vw "XQTL_DR_SUS_L1_P1C4" > mtDNA-groups_pixy_populations.list2
+# some mtDNA samples may not have nuclear samples, due to different filtering - 
+bcftools query -l HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf.gz | grep "XQTL" > nuclear.samples.list
 
-grep "all" mtDNA-groups_pixy_populations.list2 > mtDNA-groups_pixy_populations_all.list
-grep "susceptible" mtDNA-groups_pixy_populations.list2 > mtDNA-groups_pixy_populations_susceptible.list
-grep "resistant" mtDNA-groups_pixy_populations.list2 > mtDNA-groups_pixy_populations_resistant.list
-
-
-
-bsub.py 10 pixy_mtDNAgroups_dxy_all "pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_all.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_all"
-
-bsub.py 10 pixy_mtDNAgroups_dxy_sus "pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_susceptible.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_susceptible"
-
-bsub.py 10 pixy_mtDNAgroups_dxy_res "pixy --vcf hcontortus_chr5_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_resistant.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_resistant"
+grep -f nuclear.samples.list mtDNA-groups_pixy_populations.list | grep "all" > mtDNA-groups_pixy_populations_all.list
+grep -f nuclear.samples.list  mtDNA-groups_pixy_populations.list | grep "susceptible" > mtDNA-groups_pixy_populations_susceptible.list
+grep -f nuclear.samples.list mtDNA-groups_pixy_populations.list | grep "resistant" > mtDNA-groups_pixy_populations_resistant.list
 
 
 
-bsub.py 10 pixy_mtDNAgroups_dxy_all "pixy --vcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_all.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_all_chr1"
+bsub.py --queue long 10 pixy_mtDNAgroups_dxy_all "pixy --vcf HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_all.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_all"
 
-bsub.py 10 pixy_mtDNAgroups_dxy_sus "pixy --vcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_susceptible.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_susceptible_chr1"
+bsub.py --queue long 10 pixy_mtDNAgroups_dxy_sus "pixy --vcf HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_susceptible.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_susceptible"
 
-bsub.py 10 pixy_mtDNAgroups_dxy_res "pixy --vcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_resistant.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_resistant_chr1"
+bsub.py --queue long 10 pixy_mtDNAgroups_dxy_res "pixy --vcf HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf.gz --stats dxy --populations mtDNA-groups_pixy_populations_resistant.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_resistant"
 
 
-bsub.py 10 pixy_mtDNAgroups_fst_chr1_all "pixy --vcf hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz --stats fst --populations mtDNA-groups_pixy_populations_all.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_all_chr1"
 ```
 
 
@@ -202,9 +194,32 @@ bsub.py 10 pixy_mtDNAgroups_fst_chr1_all "pixy --vcf hcontortus_chr1_Celeg_TT_ar
 library(tidyverse)
 
 
-data <- read.table("mtDNA-groups_susceptible_dxy.txt", header=T)
+data <- read.table("mtDNA-groups_all_dxy.txt", header=T)
 
-ggplot(data, aes(window_pos_1, avg_dxy)) + geom_point(size=0.5) + facet_grid(pop1~pop2)
+data <- data %>% mutate(name = paste(pop1, pop2, sep = "_"))
+
+ggplot(data, aes(window_pos_1, avg_dxy)) + geom_point(size=0.5) + facet_grid(name~chromosome)
 
 ```
 
+
+
+
+bsub.py --queue long 10 pixy_mtDNAgroups_fst_all "pixy --vcf HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf.gz --stats fst --populations mtDNA-groups_pixy_populations_all.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_all"
+
+bsub.py --queue long 10 pixy_mtDNAgroups_fst_sus "pixy --vcf HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf.gz --stats fst --populations mtDNA-groups_pixy_populations_susceptible.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_susceptible"
+
+bsub.py --queue long 10 pixy_mtDNAgroups_fst_res "pixy --vcf HCON_QTL.cohort.2023-12-12.n278.nuclear_variants.final.recode.vcf.gz --stats fst --populations mtDNA-groups_pixy_populations_resistant.list --bypass_invariant_check yes --window_size 10000 --output_prefix mtDNA-groups_resistant"
+
+
+```R
+library(tidyverse)
+
+
+data <- read.table("mtDNA-groups_all_fst.txt", header=T)
+
+data <- data %>% mutate(name = paste(pop1, pop2, sep = "_"))
+
+ggplot(data, aes(window_pos_1, avg_wc_fst)) + geom_point(size=0.5) + facet_grid(name~chromosome) + ylim(0,1)
+
+```

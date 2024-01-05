@@ -315,10 +315,10 @@ printf "CHR\tPOS\n" > tmp.012.pos2 ; cat chr5_XQTL_resistant_diff0.8_biased_vari
 
 paste tmp.012.pos2 012.indv.geno > genotype_matrix
 
-
-
-while read line; do 
-coords=$(echo ${line} | cut -f1,2 -d " ")
+>genotype_matrix.chisquare
+cat genotype_matrix | sed 1d | while read line; do 
+chr=$(echo ${line} | awk '{print $1}' OFS="\t")
+pos=$(echo ${line} | awk '{print $2}' OFS="\t")
 missing=$(echo ${line} | cut -f3- -d " " | grep -o "\-1" | wc -l)
 homozygous_reference=$(echo ${line} | cut -f3- -d " " | grep -o "0" | wc -l)
 heterozygous=$(echo ${line} | cut -f3- -d " " | grep -o " 1" | wc -l)
@@ -340,8 +340,8 @@ chi_hom_ref=$(echo "scale=3; (${homozygous_reference}-${exp_homo_ref})^2 / ${exp
 chi_het=$(echo "scale=3; (${heterozygous}-${exp_het})^2/${exp_het}" | bc -l)
 chi_hom_var=$(echo "scale=3; (${homozygous_variant}-${exp_homo_var})^2/${exp_homo_var}" | bc -l)
 
-echo -e ${coords}"\t"${missing}"\t"${homozygous_reference}"\t"${heterozygous}"\t"${homozygous_variant}"\t"${exp_homo_ref}"\t"${exp_het}"\t"${exp_homo_var}"\t"${chi_hom_ref}"\t"${chi_het}"\t"${chi_hom_var}; 
-done < genotype_matrix >> genotype_matrix.chisquare
+echo -e ${chr}"\t"${pos}"\t"${missing}"\t"${homozygous_reference}"\t"${heterozygous}"\t"${homozygous_variant}"\t"${exp_homo_ref}"\t"${exp_het}"\t"${exp_homo_var}"\t"${chi_hom_ref}"\t"${chi_het}"\t"${chi_hom_var}; 
+done >> genotype_matrix.chisquare
 
 
 

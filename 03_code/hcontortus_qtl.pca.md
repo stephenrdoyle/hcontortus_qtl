@@ -7,7 +7,8 @@ cd /lustre/scratch125/pam/teams/team333/sd21/haemonchus_contortus/QTL/05_ANALYSI
 
 ```
 
-## Filter variants to keep subsets of samples
+## mtDNA variants
+- Filter variants to keep subsets of samples
 ```bash
 
 # mtDNA variants
@@ -121,9 +122,25 @@ ggsave("figure_pca_mDNA_snps_xqtl_samples.pdf", height=4.5, width=6, units="in")
 
 
 
-## Filter variants to keep subsets of samples
-```bash
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Nuclear variants
+- Filter variants to keep subsets of samples
+
+```bash
 # mtDNA variants
 
 ln -s ../../04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.autosomal_variants.recode.vcf autosome.vcf
@@ -142,7 +159,7 @@ vcftools --gzvcf autosome.vcf --keep keep.list --max-missing 0.8 --remove-indels
 # group 1 - XQTL only samples and the susceptible parental population
 grep "XQTL\|MHCO3\|GB_ISE" keep.list > keep.XQTL.list
 
-vcftools --gzvcf mito.vcf   --keep keep.XQTL.list  --max-missing 1 --remove-indels --recode --out autosome.qtl
+vcftools --gzvcf autosome.vcf  --keep keep.XQTL.list  --max-missing 1 --remove-indels --recode --out autosome.qtl
 
 #> After filtering, kept 236 out of 277 Individuals
 #> After filtering, kept 284 out of a possible 632 Sites
@@ -151,28 +168,41 @@ vcftools --gzvcf mito.vcf   --keep keep.XQTL.list  --max-missing 1 --remove-inde
 
 
 
-ln -s ../../04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.autosomal_variants.recode.vcf
 
 ## nuclear variants
+
+```bash
+ln -s ../../04_VARIANTS/FILTERED/HCON_QTL.cohort.2023-12-12.n278.autosomal_variants.recode.vcf
+
+
+```
+
+
+## Make some plots
 ```R
 library(tidyverse)
 library(SNPRelate)
+library(ggrepel)
+library(ggsci)
 
-vcf.fn <- "hcontortus_chr1_Celeg_TT_arrow_pilon.raw.vcf.gz"
 
-snpgdsVCF2GDS(vcf.fn, "nuclear.gds", method="biallelic.only")
+vcf.fn <- "autosome.all.recode.vcf" 
 
-genofile <- snpgdsOpen("nuclear.gds")
+snpgdsVCF2GDS(vcf.fn, "autosome.all.gds", method="biallelic.only")
 
-pca <- snpgdsPCA(genofile, num.thread=2, autosome.only=F)
+snpgdsClose(genofile)
+genofile <- snpgdsOpen("autosome.all.gds")
 
-pca <- snpgdsPCA(genofile, num.thread=2, autosome.only=F)
+# LD pruning
+snpset <- snpgdsLDpruning(genofile, ld.threshold=0.2, autosome.only=F)
+snpset.id <- unlist(unname(snpset))
+
+pca <- snpgdsPCA(genofile, num.thread=2, autosome.only=F, snp.id=snpset.id)
 
 data <- data.frame(sample.id = pca$sample.id,
     EV1 = pca$eigenvect[,1],    # the first eigenvector
     EV2 = pca$eigenvect[,2],    # the second eigenvector
     stringsAsFactors = FALSE)
-head(data)
 
 
 population <- read.table("sample-id_populations.txt", header=T, sep="\t") 
@@ -180,9 +210,68 @@ population <- read.table("sample-id_populations.txt", header=T, sep="\t")
 data <- inner_join(data, population, by="sample.id")
 
 
-ggplot(data, aes(EV1, EV2, colour=population)) + 
+ggplot(data, aes(EV1, EV2, colour=population, label=sample.id)) + 
      geom_point() +
-     labs(title="mitochondrial_variants",
+     theme_bw() +
+     scale_color_npg() +
+     geom_text_repel(data = subset(data, population == "Parent_susceptible"), max.overlaps = Inf) +
+     geom_text_repel(data = subset(data, population == "Parent_resistant"), max.overlaps = Inf) +
+     labs(title="autosomal SNPs: 245 samples (all), 31,951 SNPs",
           x = paste0("PC1 variance: ",round(pca$varprop[1]*100,digits=2),"%"),
           y = paste0("PC2 variance: ",round(pca$varprop[2]*100,digits=2),"%"))
+
+ggsave("figure_pca_autosome_snps_allsamples.png")
+ggsave("figure_pca_autosome_snps_allsamples.pdf", height=4.5, width=6, units="in")
+
 ```
+![](../04_analysis/figure_pca_autosome_snps_allsamples.png)
+
+
+
+
+```R
+library(tidyverse)
+library(SNPRelate)
+library(ggrepel)
+library(ggsci)
+
+
+vcf.fn <- "autosome.qtl.recode.vcf" 
+
+snpgdsVCF2GDS(vcf.fn, "autosome.qtl.gds", method="biallelic.only")
+
+snpgdsClose(genofile)
+genofile <- snpgdsOpen("autosome.qtl.gds")
+
+# LD pruning
+snpset <- snpgdsLDpruning(genofile, ld.threshold=0.2, autosome.only=F)
+snpset.id <- unlist(unname(snpset))
+
+pca <- snpgdsPCA(genofile, num.thread=2, autosome.only=F, snp.id=snpset.id)
+
+data <- data.frame(sample.id = pca$sample.id,
+    EV1 = pca$eigenvect[,1],    # the first eigenvector
+    EV2 = pca$eigenvect[,2],    # the second eigenvector
+    stringsAsFactors = FALSE)
+
+
+population <- read.table("sample-id_populations.txt", header=T, sep="\t") 
+
+data <- inner_join(data, population, by="sample.id")
+
+
+ggplot(data, aes(EV1, EV2, colour=population, label=sample.id)) + 
+     geom_point() +
+     theme_bw() +
+     scale_color_npg() +
+     geom_text_repel(data = subset(data, population == "Parent_susceptible"), max.overlaps = Inf) +
+     geom_text_repel(data = subset(data, population == "Parent_resistant"), max.overlaps = Inf) +
+     labs(title="autosomal SNPs: 235 samples (all), 6,194 SNPs",
+          x = paste0("PC1 variance: ",round(pca$varprop[1]*100,digits=2),"%"),
+          y = paste0("PC2 variance: ",round(pca$varprop[2]*100,digits=2),"%"))
+
+ggsave("figure_pca_autosome_snps_allsamples.png")
+ggsave("figure_pca_autosome_snps_allsamples.pdf", height=4.5, width=6, units="in")
+
+```
+![](../04_analysis/figure_pca_mDNA_snps_allsamples.png)
